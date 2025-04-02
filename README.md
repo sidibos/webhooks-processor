@@ -16,9 +16,9 @@ This project provides an object‑oriented PHP solution for processing and sendi
 - **Validation:**  
   The application validates each webhook parameter:
   - **URL:** Must be a valid URL string.
-  - **Order ID:** Must be an integer greater than zero.
-  - **Name:** Must not be empty.
-  - **Event:** Must not be empty.
+  - **ORDER ID:** Must be an integer greater than zero.
+  - **NAME:** Must not be empty.
+  - **EVENT:** Must not be empty.
 
 - **Design Patterns Used:**
   - **Generator Pattern:**  
@@ -52,7 +52,7 @@ This project provides an object‑oriented PHP solution for processing and sendi
 - **WebhookSender Code:**  
   The main PHP script includes the following classes:
   - `Webhook` – Represents a webhook event and validates its parameters.
-  - `WebhookLoader` – Loads webhook events from the text file using a generator.
+  - `CSVWebhookLoader` – Loads webhook events from the text file using a generator.
   - `ExponentialBackoffStrategy` – Implements the exponential back‑off delay strategy.
   - `EndpointFailureManager` – Tracks and manages failure counts per endpoint.
   - `WebhookSender` – Coordinates sending webhooks, applying retry logic and handling failures.
@@ -62,7 +62,7 @@ This project provides an object‑oriented PHP solution for processing and sendi
 ## How to Run
 
 1. **Prepare the text file in CSV format:**  
-   Create a file named `webhooks.txt` in the project directory with the following format:
+   Populate the file `webhooks.txt` in the project directory with the following format:
 
    ```bash
    URL,ORDER ID,NAME,EVENT
@@ -100,12 +100,27 @@ This project provides an object‑oriented PHP solution for processing and sendi
 
 ---
 
-## Customization
+## Trade-offs
 
-- **Configuration Parameters:**  
-  You can adjust the maximum processing time, maximum delay for retries, and the allowed number of failures per endpoint by modifying the constructor parameters of `WebhookSender`, `ExponentialBackoffStrategy`, and `EndpointFailureManager`.
+- **Simplicity vs. Flexibility:**  
+  - **CSV Loader Only:**  
+    - **Pros:** Simpler code, easier to understand, and fewer moving parts.  
+    - **Cons:** It limits you to one data source. If we need to add another source (like a database), we will have to refactor or add new code.
+  - **Ability to use different Sources (Composite/Factory Pattern):**  
+  We could use Composite or Factory Pattern for better result
+    - **Pros:** More flexible and extensible; we can easily add or change data sources without major code changes.  
+    - **Cons:** Increases code complexity and may require additional abstraction layers.
 
-- **Logging and Error Handling:**  
-  Additional logging or more sophisticated error handling can be implemented as needed based on the project requirements.
+- **Maintainability:**  
+  - With a single loader, maintenance is straightforward because there’s less code to manage.  
+  - In a composite or factory setup, while the design is more modular and scalable, it may also introduce additional complexity that needs to be maintained over time.
 
----
+- **Performance:**  
+  - A CSV-only approach may be faster and have lower overhead if the data set is small and the processing requirements are limited.  
+  - Using Composite/factory Pattern to read from different sources can add some overhead due to the additional abstraction layers, though it might be necessary if the application scales or if sources have varying performance characteristics.
+
+- **Testing and Debugging:**  
+  - A single CSV loader is easier to test and debug because we are dealing with a single source and fewer components.  
+  - More complex patterns require more thorough testing and debugging since we must ensure that each loader behaves as expected.
+
+In summary, the decision comes down to the current requirements and expected future changes.

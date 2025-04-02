@@ -75,8 +75,8 @@ class CSVWebhookLoader
                  *  might increase the performance of the webhook processing.
                  */
                 yield new Webhook(trim($url), (int) trim($orderId), trim($name), trim($event));
-            } catch (InvalidArgumentException $e) {
-                echo "Skipping invalid webhook: " . $e->getMessage() . PHP_EOL;
+            } catch (\Throwable $th) {
+                echo "Skipping invalid webhook: " . $th->getMessage() . PHP_EOL;
             }
         }
         fclose($handle);

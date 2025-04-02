@@ -23,15 +23,19 @@ try {
     // Load webhook events from the CSV file using the generator.
     $webhooksFilePath = 'webhooks.txt';
     $webhooks = (new CSVWebhookLoader($webhooksFilePath))->load();
-    
+
     if (empty($webhooks)) {
-        echo "No webhooks to process.\n";
+        echo "No webhooks to process." . PHP_EOL;
         exit(0);
     }
 
     // Process the webhooks.
     foreach ($webhooks as $webhook) {
         $webhookSender->send($webhook);
+        if ($webhookSender->maxProcessingTimeReached()) {
+            echo "Max processing time reached. Stopping processing." . PHP_EOL;
+            break;
+        }
     }
 } catch (Exception $e) {
     echo "Error: {$e->getMessage()}\n";
