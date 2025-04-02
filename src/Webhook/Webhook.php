@@ -56,6 +56,13 @@ class Webhook
 
     /**
      * Validate the input parameters.
+     * 
+     * @param string $url Endpoint URL for the webhook.
+     * @param int $orderId Order ID.
+     * @param string $name Name.
+     * @param string $event Event type.
+     * 
+     * @return void
      */
     private function validateParams(
         string $url, 

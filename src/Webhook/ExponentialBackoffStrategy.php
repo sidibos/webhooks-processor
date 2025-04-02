@@ -6,19 +6,23 @@ namespace Webhook;
 /**
  * Implements an exponential back-off strategy.
  */
-class ExponentialBackoffStrategy implements RetryStrategyInterface 
+class ExponentialBackoffStrategy implements RetryStrategyInterface
 {
-    private int $maxDelay;
-
     /**
      * @param int $maxDelay Maximum delay in seconds.
      */
-    public function __construct(int $maxDelay = 60) 
+    public function __construct(private int $maxDelay = 60)
     {
-        $this->maxDelay = $maxDelay;
     }
 
-    public function getDelay(int $attempt): int 
+    /**
+     * Returns the delay (in seconds) for the given attempt.
+     * 
+     * @param int $attempt The attempt count
+     * 
+     * @return int Delay in seconds.
+     */
+    public function getDelay(int $attempt): int
     {
         // Delay doubles on each attempt: 1s, 2s, 4s, 8s, ...
         $delay = pow(2, $attempt - 1);

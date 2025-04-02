@@ -9,9 +9,6 @@ namespace Webhook;
  */
 class WebhookSender 
 {
-    private RetryStrategyInterface $retryStrategy;
-    private EndpointFailureManager $failureManager;
-    private int $maxProcessingTime;
     private int $startTime;
 
     /**
@@ -20,13 +17,10 @@ class WebhookSender
      * @param int $maxProcessingTime Maximum processing time in seconds.
      */
     public function __construct(
-        RetryStrategyInterface $retryStrategy, 
-        EndpointFailureManager $failureManager, 
-        int $maxProcessingTime = 80
+        private RetryStrategyInterface $retryStrategy,
+        private EndpointFailureManager $failureManager,
+        private int $maxProcessingTime = 80
     ) {
-        $this->retryStrategy        = $retryStrategy;
-        $this->failureManager       = $failureManager;
-        $this->maxProcessingTime    = $maxProcessingTime;
         $this->startTime            = time();
     }
 
@@ -34,48 +28,55 @@ class WebhookSender
      * Sends a webhook with retries using exponential back-off.
      *
      * @param Webhook $webhook
+     * 
+     * @return void
      */
-    public function processWebhook(Webhook $webhook) 
+    public function send(Webhook $webhook): void
     {
-        $endpoint = $webhook->getUrl();
+        try {
+            $endpoint = $webhook->getUrl();
 
-        // Skip if the endpoint has exceeded the failure limit.
-        if ($this->failureManager->shouldSkip($endpoint)) {
-            echo "Skipping webhook for endpoint {$endpoint} due to failure limit reached." . PHP_EOL;
-            return;
-        }
-
-        $attempt    = 1;
-        $sent       = false;
-        while (!$sent) {
-            // Check if overall processing time is exceeded.
-            $elapsed = time() - $this->startTime;
-            if ($elapsed >= $this->maxProcessingTime) {
-                echo "Processing time exceeded {$this->maxProcessingTime} seconds. Terminating processing." . PJHP_EOL;
-                exit;
+            // Skip if the endpoint has exceeded the failure limit.
+            if ($this->failureManager->shouldSkip($endpoint)) {
+                echo "Skip sending webhook for endpoint {$endpoint} due to failure limit reached." . PHP_EOL;
+                return;
             }
 
-            // Attempt to send the webhook.
-            $sent = $this->send($webhook);
-            if ($sent) {
-                echo "Webhook sent successfully to {$endpoint} for Order ID {$webhook->getOrderId()}." . PHP_EOL;
-            } else {
-                echo "Failed to send webhook to {$endpoint} for Order ID {$webhook->getOrderId()}. ";
-                $this->failureManager->recordFailure($endpoint);
-                if ($this->failureManager->shouldSkip($endpoint)) {
-                    echo "Exceeded failure limit for {$endpoint}. Aborting further attempts for this endpoint." . PHP_EOL;
-                    break;
+            $attempt    = 1;
+            $sent       = false;
+            while (!$sent) {
+                // Check if overall processing time is exceeded.
+                $elapsed = time() - $this->startTime;
+                if ($elapsed >= $this->maxProcessingTime) {
+                    echo "Processing time exceeded {$this->maxProcessingTime} seconds. Terminating processing." . PJHP_EOL;
+                    exit;
                 }
-                $delay = $this->retryStrategy->getDelay($attempt);
-                // Check if waiting the delay would exceed max processing time.
-                if ((time() - $this->startTime) + $delay > $this->maxProcessingTime) {
-                    echo "Not enough time remaining to retry webhook for {$endpoint}. Skipping this webhook." . PHP_EOL;
-                    break;
+
+                // Attempt to send the webhook.
+                $sent = $this->sendWebhookRequest($webhook);
+                if ($sent) {
+                    echo "Webhook sent successfully to {$endpoint} for Order ID {$webhook->getOrderId()}." . PHP_EOL;
+                } else {
+                    echo "Failed to send webhook to {$endpoint} for Order ID {$webhook->getOrderId()}. ";
+                    $this->failureManager->recordFailure($endpoint);
+                    if ($this->failureManager->shouldSkip($endpoint)) {
+                        echo "Exceeded failure limit for {$endpoint}. Aborting further attempts for this endpoint." . PHP_EOL;
+                        break;
+                    }
+                    $delay = $this->retryStrategy->getDelay($attempt);
+                    // Check if waiting the delay would exceed max processing time.
+                    if ((time() - $this->startTime) + $delay > $this->maxProcessingTime) {
+                        echo "Not enough time remaining to retry webhook for {$endpoint}. Skipping this webhook." . PHP_EOL;
+                        break;
+                    }
+                    echo "Retrying in {$delay} seconds..." . PHP_EOL;
+                    sleep($delay);
+                    $attempt++;
                 }
-                echo "Retrying in {$delay} seconds..." . PHP_EOL;
-                sleep($delay);
-                $attempt++;
             }
+        } catch (Exception $e) {
+            echo "Error sending webhook for Order ID {$webhook->getOrderId()}: {$e->getMessage()}" 
+            . PHP_EOL;
         }
     }
 
@@ -86,7 +87,7 @@ class WebhookSender
      * 
      * @return bool True if sending succeeded; false otherwise.
      */
-    public function send(Webhook $webhook): bool 
+    private function sendWebhookRequest(Webhook $webhook): bool
     {
         echo 'sending webhook: ' . $webhook->getUrl() . PHP_EOL;
         
