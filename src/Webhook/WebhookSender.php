@@ -76,8 +76,8 @@ class WebhookSender
                     $attempt++;
                 }
             }
-        } catch (Exception $e) {
-            echo "Error sending webhook for Order ID {$webhook->getOrderId()}: {$e->getMessage()}" . PHP_EOL;
+        } catch (\Throwable $th) {
+            echo "Error sending webhook for Order ID {$webhook->getOrderId()}: {$th->getMessage()}" . PHP_EOL;
             return false;
         }
     }
@@ -127,8 +127,8 @@ class WebhookSender
             }
 
             return true;
-        } catch (Exception $e) {
-            echo "Error sending webhook for URL {$webhook->url}: " . $e->getMessage() ." . PHP_EOL"; 
+        } catch (\Throwable $th) {
+            echo "Error sending webhook for URL {$webhook->url}: " . $th->getMessage() ." . PHP_EOL";
             return false;
         }
     }

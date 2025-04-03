@@ -39,7 +39,7 @@ This project provides an object‑oriented PHP solution for processing and sendi
 
 ## Requirements
 
-- PHP 7 or later.
+- PHP 8 or later.
 - A text file named `webhooks.txt` in the project directory with the correct format.
 
 ---
@@ -123,4 +123,9 @@ This project provides an object‑oriented PHP solution for processing and sendi
   - A single CSV loader is easier to test and debug because we are dealing with a single source and fewer components.  
   - More complex patterns require more thorough testing and debugging since we must ensure that each loader behaves as expected.
 
-In summary, the decision comes down to the current requirements and expected future changes.
+- **Performance vs. Maintainability:** 
+ - The use of an object instead of an array to represent the webhook, because the Webhook class enforces type safety and validation.
+ - This might increase the reliability of the webhook processing.
+ - On the other hand, instantiating objects can be slightly more resource-intensive than using simple arrays, especially if we are processing a very large number of webhook entries. However, this overhead is typically negligible for most use cases.
+
+In summary, the decision comes down to the requirements and expected future changes.

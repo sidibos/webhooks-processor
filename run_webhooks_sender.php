@@ -33,7 +33,7 @@ try {
     foreach ($webhooks as $webhook) {
         $webhookSender->send($webhook);
         if ($webhookSender->maxProcessingTimeReached()) {
-            echo "Max processing time reached. Stopping processing." . PHP_EOL;
+            // Max processing time reached. Stopping processing
             break;
         }
     }

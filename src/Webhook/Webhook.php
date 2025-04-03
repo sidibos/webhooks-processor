@@ -8,26 +8,21 @@ namespace Webhook;
  */
 class Webhook 
 {
-    private string $url;
-    private int $orderId;
-    private string $name;
-    private string $event;
-
     /**
      * @param string $url Endpoint URL for the webhook.
      * @param int $orderId Order ID.
      * @param string $name Name.
      * @param string $event Event type.
      */
-    public function __construct(string $url, int $orderId, string $name, string $event) 
+    public function __construct(
+        private string $url,
+        private int $orderId,
+        private string $name,
+        private string $event
+    )
     {
         // Validate input.
-        $this->validateParams($url, $orderId, $name, $event);
-
-        $this->url      = $url;
-        $this->orderId  = $orderId;
-        $this->name     = $name;
-        $this->event    = $event;
+        $this->validateParams();
     }
 
     public function getUrl(): string
@@ -57,34 +52,26 @@ class Webhook
     /**
      * Validate the input parameters.
      * 
-     * @param string $url Endpoint URL for the webhook.
-     * @param int $orderId Order ID.
-     * @param string $name Name.
-     * @param string $event Event type.
-     * 
      * @return void
+     * 
+     * @throws \InvalidArgumentException If any parameter is invalid.
      */
-    private function validateParams(
-        string $url, 
-        int $orderId, 
-        string $name, 
-        string $event
-    ): void
+    private function validateParams(): void
     {
         // Validate URL.
-        if (empty(trim($url)) || !filter_var($url, FILTER_VALIDATE_URL)) {
+        if (empty(trim($this->url)) || !filter_var($this->url, FILTER_VALIDATE_URL)) {
             throw new \InvalidArgumentException("Invalid URL provided: {$url}");
         }
 
-        if($orderId <= 0) {
+        if($this->orderId <= 0) {
             throw new \InvalidArgumentException("Invalid order ID provided.");
         }
 
-        if (empty(trim($name))) {
+        if (empty(trim($this->name))) {
             throw new \InvalidArgumentException("Invalid name provided in payload.");
         }
 
-        if (empty(trim($event))) {
+        if (empty(trim($this->event))) {
             throw new \InvalidArgumentException("Invalid event provided in payload.");
         }
     }
