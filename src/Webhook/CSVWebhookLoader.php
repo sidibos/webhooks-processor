@@ -29,21 +29,22 @@ class CSVWebhookLoader
     /**
      * Loads webhook objects from a CSV file.
      *
-     * @return \Generator Yields valid Webhook objects.
+     * @return array Returns an array of valid Webhook objects.
      * 
      * @throws Exception if the file cannot be opened or the header is invalid.
      */
-    public function load(): \Generator 
+    public function load(): array
     {
         if (!file_exists($this->filePath)) {
             throw new Exception("File not found: {$this->filePath}");
         }
+
         $handle = fopen($this->filePath, 'r');
         if ($handle === false) {
             throw new Exception("Unable to open file: {$this->filePath}");
         }
         
-        // Read header row.
+        // Read header row and normalize it.
         $headers = fgetcsv($handle);
         $headers = \array_map('trim', $headers);
         $headers = \array_map('strtoupper', $headers);
@@ -57,28 +58,33 @@ class CSVWebhookLoader
             throw new Exception("Invalid headers in {$this->filePath}");
         }
 
+        $webhooks = []; // List to collect Webhook objects
         $headersSize = count($headers);
 
         // Loop through each row.
         while (($row = fgetcsv($handle)) !== false) {
-            // Expecting 4 columns: URL, ORDER ID, NAME, EVENT.
+            // Skip rows with missing data
             if (count($row) < $headersSize) {
-                continue; // Skip incomplete rows.
+                continue;
             }
+
             list($url, $orderId, $name, $event) = $row;
+
             try {
-                /**
-                 * We are using an object instead of an array to represent the webhook.
-                 *  This is because the Webhook class enforces type safety and validation.
-                 *  which might increase the reliability of the webhook processing.
-                 *  We could use an array here, but it would be less type-safe.
-                 *  might increase the performance of the webhook processing.
-                 */
-                yield new Webhook(trim($url), (int) trim($orderId), trim($name), trim($event));
+                // Create a Webhook object and add it to the array
+                $webhooks[] = new Webhook(
+                    trim($url),
+                    (int) trim($orderId),
+                    trim($name),
+                    trim($event)
+                );
             } catch (\Throwable $th) {
                 echo "Skipping invalid webhook: " . $th->getMessage() . PHP_EOL;
             }
         }
+
         fclose($handle);
+
+        return $webhooks;
     }
 }

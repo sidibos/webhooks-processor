@@ -29,14 +29,10 @@ try {
         exit(0);
     }
 
-    // Process the webhooks.
-    foreach ($webhooks as $webhook) {
-        $webhookSender->send($webhook);
-        if ($webhookSender->maxProcessingTimeReached()) {
-            // Max processing time reached. Stopping processing
-            break;
-        }
-    }
+    $webhookSender->send($webhooks);
+
+    echo '<pre>';
+    print_r($webhookSender->getProcessedWebhooks());
 } catch (Exception $e) {
     echo "Error: {$e->getMessage()}\n";
     exit(1);

@@ -11,124 +11,120 @@ class WebhookSender
 {
     private int $startTime;
     private bool $maxProcessingTimeReached = false;
+    private array $webhooksProcessed = [];
 
-    /**
-     * @param RetryStrategyInterface $retryStrategy The retry strategy to use.
-     * @param EndpointFailureManager $failureManager Manages endpoint failures.
-     * @param int $maxProcessingTime Maximum processing time in seconds.
-     */
     public function __construct(
         private RetryStrategyInterface $retryStrategy,
         private EndpointFailureManager $failureManager,
         private int $maxProcessingTime = 80
     ) {
-        $this->startTime            = time();
+        $this->startTime = time();
     }
 
     /**
-     * Sends a webhook with retries using exponential back-off.
+     * Sends a list of webhooks with retries and back-off.
      *
-     * @param Webhook $webhook
+     * @param Webhook[] $webhooks
      * 
-     * @return bool True on success; false on failure.
+     * @return void
      */
-    public function send(Webhook $webhook): bool
+    public function send(array $webhooks): void
     {
-        try {
+        foreach ($webhooks as $webhook) {
             $endpoint = $webhook->getUrl();
 
-            // Skip if the endpoint has exceeded the failure limit.
             if ($this->failureManager->shouldSkip($endpoint)) {
-                return false;
+                echo "Skipping {$endpoint} due to failure threshold." . PHP_EOL;
+                continue;
             }
 
             $attempt = 1;
-            $sent    = false;
+            $sent = false;
+
             while (!$sent) {
-                // Check if overall processing time is exceeded.
                 $elapsed = time() - $this->startTime;
                 if ($elapsed >= $this->maxProcessingTime) {
-                    echo "Processing time exceeded {$this->maxProcessingTime} seconds. Terminating processing." . PHP_EOL;
-                    $this->maxProcessingTimeReached = true;
-                    return false;
+                    echo "Max processing time ({$this->maxProcessingTime}s) reached. Stopping further sends." . PHP_EOL;
+                    break;
                 }
 
-                // Attempt to send the webhook.
                 $sent = $this->sendWebhookRequest($webhook);
+
                 if ($sent) {
-                    echo "Webhook sent successfully to {$endpoint} for Order ID {$webhook->getOrderId()}." . PHP_EOL;
-                    return true;
-                } else {
-                    echo "Failed to send webhook to {$endpoint} for Order ID {$webhook->getOrderId()}. ";
-                    $this->failureManager->recordFailure($endpoint);
-                    if ($this->failureManager->shouldSkip($endpoint)) {
-                        echo "Exceeded failure limit for {$endpoint}. Aborting further attempts for this endpoint." . PHP_EOL;
-                        return false;
-                    }
-                    $delay = $this->retryStrategy->getDelay($attempt);
-                    // Check if waiting the delay would exceed max processing time.
-                    if ((time() - $this->startTime) + $delay > $this->maxProcessingTime) {
-                        echo "Not enough time remaining to retry webhook for {$endpoint}. Skipping this webhook." . PHP_EOL;
-                        return false;
-                    }
-                    echo "Retrying in {$delay} seconds..." . PHP_EOL;
-                    sleep($delay);
-                    $attempt++;
+                    echo "✅ Webhook sent to {$endpoint} (Order ID: {$webhook->getOrderId()})" . PHP_EOL;
+                    $this->processedWebhooks[$endpoint][] = $webhook->getOrderId();
+                    break;
                 }
+
+                echo "❌ Failed to send webhook to {$endpoint} (Order ID: {$webhook->getOrderId()})" . PHP_EOL;
+                $this->failureManager->recordFailure($endpoint);
+
+                if ($this->failureManager->shouldSkip($endpoint)) {
+                    echo "Endpoint {$endpoint} has exceeded failure limit. Skipping further attempts." . PHP_EOL;
+                    break;
+                }
+
+                $delay = $this->retryStrategy->getDelay($attempt);
+                if ((time() - $this->startTime) + $delay > $this->maxProcessingTime) {
+                    echo "Not enough time to retry {$endpoint}. Skipping." . PHP_EOL;
+                    break;
+                }
+
+                echo "Retrying in {$delay}s..." . PHP_EOL;
+                sleep($delay);
+                $attempt++;
             }
-        } catch (\Throwable $th) {
-            echo "Error sending webhook for Order ID {$webhook->getOrderId()}: {$th->getMessage()}" . PHP_EOL;
-            return false;
         }
     }
 
     /**
-     * Returns true if the maximum processing time has been reached.
+     * List of webhooks processed with succes
+     *
      */
-    public function maxProcessingTimeReached(): bool
+    public function getProcessedWebhooks(): array
     {
-        return $this->maxProcessingTimeReached;
+        return $this->processedWebhooks;
     }
 
     /**
-     * Send webhook request.
+     * Sends a webhook request.
      *
      * @param Webhook $webhook
      * 
-     * @return bool True if sending succeeded; false otherwise.
+     * @return bool
      */
     private function sendWebhookRequest(Webhook $webhook): bool
     {
-        echo 'sending webhook: ' . $webhook->getUrl() . PHP_EOL;
-        
+        echo "Sending webhook: {$webhook->getUrl()}" . PHP_EOL;
+
         try {
             $ch = curl_init($webhook->getUrl());
             if (!$ch) {
                 throw new RuntimeException("Failed to initialize cURL");
             }
-            
+
             curl_setopt($ch, CURLOPT_POST, 1);
             curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($webhook->getPayload()));
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 10); // Prevents long-hanging requests
-            
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+
             $response = curl_exec($ch);
             if ($response === false) {
                 throw new RuntimeException("cURL error: " . curl_error($ch));
             }
-            
+
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
 
             if ($httpCode !== 200) {
-                echo "Webhook failed with HTTP code: $httpCode" . PHP_EOL;
+                echo "⚠️  Webhook failed with HTTP code: $httpCode" . PHP_EOL;
                 return false;
             }
 
             return true;
         } catch (\Throwable $th) {
-            echo "Error sending webhook for URL {$webhook->url}: " . $th->getMessage() ." . PHP_EOL";
+            echo "Error sending webhook to {$webhook->getUrl()}: {$th->getMessage()}" . PHP_EOL;
             return false;
         }
     }
